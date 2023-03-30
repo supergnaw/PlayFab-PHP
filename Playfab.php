@@ -1,7 +1,7 @@
 <?php
-	declare( strict_types = 1 );
+    declare( strict_types = 1 );
 
-	namespace app\PlayFab;
+    namespace app\PlayFab;
 
     class Playfab {
         /*
@@ -13,8 +13,8 @@
         private string $response;
 
 
-		// application identification
-		protected string $app_id;
+        // application identification
+        protected string $app_id;
         protected string $username;
         protected string $email;
         protected string $password;
@@ -23,7 +23,7 @@
         private string | null $sessionTicket = null;
         private string | null $playFabId = null;
 
-		// endpoints
+        // endpoints
         private string $BASE_ENDPOINT = "https://titleId.playfabapi.com";
 
 
@@ -36,12 +36,12 @@
          * @param string $password
          */
         public function __construct(string $app_id, string $username, string $email, string $password)
-		{
-			$this->set_app_id( $app_id );
-			$this->set_username( $username );
-			$this->set_email( $email );
-			$this->set_password( $password );
-		}
+        {
+            $this->set_app_id( $app_id );
+            $this->set_username( $username );
+            $this->set_email( $email );
+            $this->set_password( $password );
+        }
 
         /**
          * Invoker
@@ -56,7 +56,7 @@
             $this->set_app_id( $app_id );
             $this->set_email( $email );
             $this->set_password( $password );
-		}
+        }
 
         /*
             2.0 Variable Implementations
@@ -415,9 +415,9 @@
             if ($exit) exit();
         }
 
-		/*
-			X.0 Other
-		*/
+        /*
+            X.0 Other
+        */
 
         /**
          * Generate HTML code for a two-dimensional array
@@ -428,32 +428,32 @@
          * @return string
          */
         public static function html_table(array $table, string $tblClass = "", array $colClass = [] ): string
-		{
-			// table start
-			$code = "";
-			$code .= "<table class='{$tblClass}'>";
+        {
+            // table start
+            $code = "";
+            $code .= "<table class='{$tblClass}'>";
 
-			// add headers
-			$hdrs = "";
-			foreach( $table[0] as $col => $data ) {
-				$class = ( array_key_exists( $col, $colClass )) ? "class='{$colClass[$col]}'" : "";
-				$hdrs .= "<th {$class}>{$col}</th>";
-			}
-			$code .= "<tr>{$hdrs}</tr>";
+            // add headers
+            $hdrs = "";
+            foreach( $table[0] as $col => $data ) {
+                $class = ( array_key_exists( $col, $colClass )) ? "class='{$colClass[$col]}'" : "";
+                $hdrs .= "<th {$class}>{$col}</th>";
+            }
+            $code .= "<tr>{$hdrs}</tr>";
 
-			// add _depricated_data
-			foreach( $table as $tblRow ) {
-				$row = "";
-				foreach( $tblRow as $col => $val ) {
-					$class = ( array_key_exists( $col, $colClass )) ? "class='{$colClass[$col]}'" : "";
-					$row .= "<td {$class}>{$val}</td>";
-				}
-				$code .= "<tr>{$row}</tr>";
-			}
+            // add _depricated_data
+            foreach( $table as $tblRow ) {
+                $row = "";
+                foreach( $tblRow as $col => $val ) {
+                    $class = ( array_key_exists( $col, $colClass )) ? "class='{$colClass[$col]}'" : "";
+                    $row .= "<td {$class}>{$val}</td>";
+                }
+                $code .= "<tr>{$row}</tr>";
+            }
 
-			// table end
-			$code .= "</table>";
-			return $code;
-		}
-	}
+            // table end
+            $code .= "</table>";
+            return $code;
+        }
+    }
 
