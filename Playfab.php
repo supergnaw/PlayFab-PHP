@@ -330,14 +330,23 @@
             try {
                 if (!$this->stmt->execute()) {
                     $error = $this->stmt->errorInfo();
-                    echo "<pre>Statement Info:\n" . $this->stmt->queryString . "</pre>";
-                    throw new PDOException("MySQL error {$error[1]}: {$error[2]} ({$error[0]})");
+                    if ($this->debug) {
+                        echo "<pre>Statement Info:\n" . $this->stmt->queryString . "</pre>";
+                        throw new PDOException("MySQL error {$error[1]}: {$error[2]} ({$error[0]})");
+                    } else {
+                        die("SQL Error: {$error[1]}");
+                    }
                 }
             } catch (PDOException $e) {
                 $msg = $e->getMessage();
-                var_dump($this->stmt->debugDumpParams());
-                echo "<pre>Statement Info:\n" . $this->stmt->queryString ."</pre>";
-                throw new PDOException("PDO Exception: {$msg}");
+                if ($this->debug) {
+                    echo "<pre>Statement Info:\n" . $this->stmt->queryString;
+                    print_r($this->stmt->debugDumpParams());
+                    echo "</pre>";
+                    throw new PDOException("PDO Exception: {$msg}");
+                } else {
+                    die("PDO Exception: {$msg}");
+                }
             }
             return true;
         }
@@ -400,17 +409,17 @@
                         `call_client` VARCHAR(64) , 
                         `call_time` DATETIME DEFAULT NOW() ,
                         `status_code` VARCHAR(3)
-                    );
+                    ) ENGINE = InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;;
                     CREATE TABLE IF NOT EXISTS `playfab_news_entries` (
-                        `news_id` VARCHAR(36) PRIMARY KEY UNIQUE ,
+                        `news_id` VARCHAR(36) PRIMARY KEY ,
                         `news_title` VARCHAR(128) ,
                         `news_body` VARCHAR(2048) ,
                         `news_timestamp` TIMESTAMP
-                    );
+                    ) ENGINE = InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;;
                     CREATE TABLE IF NOT EXISTS `playfab_title_data` (
-                        `data_id` VARCHAR(64) PRIMARY KEY UNIQUE ,
+                        `data_id` VARCHAR(64) PRIMARY KEY ,
                         `data_content` TEXT
-                    );";
+                    ) ENGINE = InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;;";
             $this->sql_exec($sql);
         }
 
@@ -472,8 +481,7 @@
         {
             if (!$this->valid_schema(table: $table)) {
                 $sql = "CREATE TABLE IF NOT EXISTS `{$table}` (
-                            `data_id` VARCHAR(64) NOT NULL,
-                            PRIMARY KEY ( `data_id` )
+                            `data_id` VARCHAR(64) NOT NULL PRIMARY KEY
                         ) ENGINE = InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
                 $this->sql_exec($sql);
                 $this->load_table_schema();
@@ -638,13 +646,6 @@
             $method = (in_array(strtoupper($method), ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'])) ? strtoupper($method) : "GET";
             #$params = $this->compile_params($params); // was used for GET but everything is POST
 
-            echo "<pre>";
-            print_r($this->base_endpoint . $endpoint);
-            print_r($method);
-            print_r($headers);
-            print_r($params);
-            echo "</pre>";
-
             // curl options
             # all curl options list: https://www.php.net/manual/en/function.curl-setopt.php
             $options = [
@@ -668,9 +669,7 @@
             $curl = curl_init();
             curl_setopt_array($curl, $options);
             $this->response = curl_exec($curl);
-            print_r($this->response);
             $this->log_api_call(endpoint: $endpoint, status_code: json_decode(json: $this->response ?: [])->code ?? 0);
-            echo "\nmade it to line " . __LINE__ . "\n";
 
             // debug printing
             if ($this->debug) {
@@ -777,20 +776,7 @@
                 die("Could not authenticate with Playfab: missing email or password.");
             }
 
-            $debug = [
-                "session_ticket_expired" => $this->session_ticket_expired(),
-                "force_login" => $force,
-                "ignore_login" => (!$this->session_ticket_expired() and !$force)
-            ];
-
-            echo "<pre>";
-            echo "\nmade it to line " . __LINE__ . "\n";
-            echo json_encode($debug, JSON_PRETTY_PRINT);
             if (!$this->session_ticket_expired() and !$force) return;
-            echo "\nmade it to line " . __LINE__ . "\n";
-            print_r($_SESSION['PlayFab']);
-            echo "</pre>";
-//            die;
 
             $params = [
                 "Email" => $this->email,
@@ -798,7 +784,6 @@
                 "TitleId" => $this->app_id
             ];
 
-//            var_dump();
             $r = $this->make_rest_call(endpoint: ENDPOINT_LOGIN_EMAIL, params: $params);
             $this->playFabId = $r->data->PlayFabId;
             $_SESSION['PlayFab'] = $r->data;
@@ -955,27 +940,26 @@
          *
          * @return string
          */
-        public function get_title_data(string | array $keys = [], string $search = null, bool $force_update = false): stdClass
+        public function get_title_data(string | array $keys = [], string $search = null, bool $force_update = false, string $ignore_regex = ''): stdClass
         {
+            // do some limited formatting and input validation
+            if (!is_array($keys)) $keys = ["Keys" => [$keys]];
+            $keys = (array_key_exists(key: "Keys", array: $keys)) ? $keys : ["Keys" => $keys];
+
             if ($this->endpoint_stale(endpoint: ENDPOINT_GET_TITLE_DATA, hours: PLAYFAB_GO_STALE_HOURS_TITLE_DATA) or $force_update) {
                 // make a new call to update the database
                 $headers = [
                     'Content-Type: application/json',
                     "X-Authorization: {$this->session_ticket()}"
                 ];
-                print_r($headers);
 
-                if (is_string($keys)) {
-                    $keys = ["Keys" => [$keys]];
-                }
-                if (is_array($keys)) {
-                    $keys = (array_key_exists(key: "Keys", array: $keys)) ? $keys : ["Keys" => $keys];
-                }
-//                $params = (is_string($keys)("Keys", $keys)) ? ["Keys" => $keys] : ["Keys" => [$keys]];
                 $r = $this->make_rest_call(endpoint: ENDPOINT_GET_TITLE_DATA, headers: $headers, params: $keys);
 
-                echo "\nmade it to line " . __LINE__ . "\n";
                 foreach ($r->data->Data as $type => $content) {
+                    if(!empty($ignore_regex) and 0 < preg_match($ignore_regex, $type)) {
+                        continue;
+                    }
+
                     $table = "playfab_data_" . $this::pascal_to_snake($type);
                     foreach (json_decode($content) as $id => $data) {
                         $cols = ['data_id'];
@@ -988,19 +972,13 @@
                             $update[] = "`{$col}` = :{$col}";
                             $params[$col] = $val;
                         }
-                        $update = implode(separator: ",", array: $update);
-                        if (1 == count($cols)) {
-                            $colcount = count($cols);
-                            $cols = json_encode($cols);
-                            continue;
-                            die("\$cols ({$colcount}): {$cols}");
-                            die("\$update (" . strlen($update) . "): {$update}");
-                            var_dump("update for {$params['data_id']}: {$update}");
-                            echo "<pre>data for {$params['data_id']}:\n-----\n". print_r($params) ."\n-----</pre>";
-                        }
-                        $sql = "INSERT INTO `{$table}` ( `". implode(separator: "`, `", array: $cols)."` )
-                                VALUES ( :". implode(separator: ", :", array: $cols) ." )
+                        $update = implode(separator: ",\n", array: $update);
+
+                        $sql = "INSERT INTO `{$table}` ( `". implode(separator: "`,\n`", array: $cols)."` )
+                                VALUES ( :". implode(separator: ",\n:", array: $cols) ." )
                                 ON DUPLICATE KEY UPDATE {$update};";
+                        echo "<pre>";
+                        echo "</pre><hr>";
                         $this->sql_exec($sql, $params);
                     }
                 }
@@ -1011,10 +989,12 @@
             if ($search) $where[] = "`data_content` LIKE :search";
             $where = (0 < count(value: $where)) ? "WHERE " . implode(separator: " AND ", array: $where) : '';
             $where = '';
+            $params = [];
 
             $objs = new stdClass();
-            foreach ($keys["Keys"] ?? [] as $key) {
-                var_dump($key);
+
+            foreach (($keys["Keys"] ?? []) as $key) {
+                if(!empty($ignore_regex) and 0 < preg_match($ignore_regex, $key)) continue;
                 $table = "playfab_data_" . $this::pascal_to_snake($key);
                 $this->sql_exec(query: "SELECT * FROM `{$table}` {$where};", params: $params);
                 $results = $this->results();
@@ -1041,7 +1021,6 @@
             echo "<pre>";
 
             $r = $this->make_rest_call(endpoint: ENDPOINT_GET_TITLE_DATA, headers: $headers);
-            print_r(array_keys((array)$r->data->Data));
 
             $params = [
                 "keys" => [
@@ -1147,8 +1126,7 @@
         public static function dump_response(string | stdClass | array $response = null, bool $exit = true): void
         {
             header('Content-Type: application/json; charset=utf-8');
-            $response = (is_string($response)) ?: json_encode(value: $response, flags: JSON_PRETTY_PRINT);
-            echo $response;
+            echo (is_string($response)) ?: json_encode(value: $response, flags: JSON_PRETTY_PRINT);
             if ($exit) exit();
         }
 
@@ -1166,6 +1144,7 @@
         public static function pascal_to_snake(string $input): string
         {
             $input = preg_replace(pattern: '/([A-Z])/', replacement: '_$1', subject: $input);
+            $input = preg_replace(pattern: '/\s+/', replacement: '_', subject: $input);
             $input = preg_replace(pattern: '/(_+)/', replacement: '_', subject: $input);
             return strtolower(trim(string: $input, characters: "_"));
         }
@@ -1239,4 +1218,3 @@
             return $code;
         }
     }
-
