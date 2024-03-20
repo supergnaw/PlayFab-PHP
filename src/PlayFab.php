@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supergnaw\PlayfabPhp;
+namespace Supergnaw\PlayFabPhp;
 
 use PDO;
 use PDOException;
