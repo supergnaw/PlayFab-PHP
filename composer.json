@@ -1,0 +1,13 @@
+{
+    "name": "supergnaw/playfab-php",
+    "description": "A single-file PHP class for simple PlayFab API calls that uses the local database for caching.",
+    "type": "library",
+    "license": "GPL-3.0",
+    "autoload": {
+        "psr-4": {
+            "Supergnaw\\PlayfabPhp\\": "src/"
+        }
+    },
+    "minimum-stability": "stable",
+    "require": {}
+}
